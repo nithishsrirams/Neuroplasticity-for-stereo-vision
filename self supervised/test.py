@@ -14,6 +14,39 @@ from utils.metrics import validate_epe
 from utils.visualization import save_disparity_images, show_disparity
 
 
+def save_epe_d1_plots(clean_metrics: dict, degraded_metrics: dict, path: Path, suptitle: str = "") -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    labels = ["Clean", "Degraded"]
+    epe_vals = [clean_metrics["EPE"], degraded_metrics["EPE"]]
+    d1_frac = [clean_metrics["D1-all"], degraded_metrics["D1-all"]]
+    d1_pct = [v * 100.0 for v in d1_frac]
+
+    fig, axes = plt.subplots(1, 2, figsize=(8, 3.8))
+    colors = ("#2ca02c", "#d62728")
+    axes[0].bar(labels, epe_vals, color=colors)
+    axes[0].set_ylabel("EPE (pixels)")
+    axes[0].set_title("End-point error")
+
+    axes[1].bar(labels, d1_pct, color=colors)
+    axes[1].set_ylabel("D1-all (%)")
+    axes[1].set_title("D1-all")
+
+    if suptitle:
+        fig.suptitle(suptitle, fontsize=11)
+        fig.tight_layout(rect=(0, 0, 1, 0.94))
+    else:
+        fig.tight_layout()
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
 def save_loader_preds(model, loader, device, out_dir, show=False, title_prefix=""):
     model.eval()
     out_dir = Path(out_dir)
@@ -96,6 +129,11 @@ def main():
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump({"clean": clean_metrics, "degraded": degraded_metrics}, f, indent=2)
     print("\nWrote", metrics_path)
+
+    plot_path = out / "epe_d1_comparison.png"
+    plot_title = f"{args.degrade_type} sev{args.degrade_severity} {args.degrade_camera}"
+    save_epe_d1_plots(clean_metrics, degraded_metrics, plot_path, suptitle=plot_title)
+    print("Wrote", plot_path)
 
     save_loader_preds(model, clean_loader, device, out / "clean", args.show)
     save_loader_preds(model, degraded_loader, device, out / "degraded", args.show, "degraded")
