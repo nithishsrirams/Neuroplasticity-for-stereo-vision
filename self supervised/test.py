@@ -14,6 +14,20 @@ from utils.metrics import validate_epe
 from utils.visualization import save_disparity_images, show_disparity
 
 
+def _annotate_bars(ax, heights, fmt: str) -> None:
+    for rect, h in zip(ax.patches, heights):
+        y = rect.get_height()
+        ax.annotate(
+            fmt.format(y),
+            xy=(rect.get_x() + rect.get_width() / 2, y),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+
 def save_epe_d1_plots(clean_metrics: dict, degraded_metrics: dict, path: Path, suptitle: str = "") -> None:
     import matplotlib
 
@@ -21,30 +35,56 @@ def save_epe_d1_plots(clean_metrics: dict, degraded_metrics: dict, path: Path, s
     import matplotlib.pyplot as plt
 
     labels = ["Clean", "Degraded"]
+    x = range(len(labels))
     epe_vals = [clean_metrics["EPE"], degraded_metrics["EPE"]]
     d1_frac = [clean_metrics["D1-all"], degraded_metrics["D1-all"]]
     d1_pct = [v * 100.0 for v in d1_frac]
 
-    fig, axes = plt.subplots(1, 2, figsize=(8, 3.8))
+    fig, axes = plt.subplots(1, 2, figsize=(8.5, 4.0))
     colors = ("#2ca02c", "#d62728")
-    axes[0].bar(labels, epe_vals, color=colors)
+    axes[0].bar(x, epe_vals, color=colors, width=0.55, edgecolor="black", linewidth=0.6)
+    axes[0].set_xticks(list(x))
+    axes[0].set_xticklabels(labels)
     axes[0].set_ylabel("EPE (pixels)")
     axes[0].set_title("End-point error")
+    axes[0].set_ylim(bottom=0)
+    axes[0].yaxis.grid(True, linestyle="--", alpha=0.35)
+    axes[0].set_axisbelow(True)
+    _annotate_bars(axes[0], epe_vals, "{:.3f}")
 
-    axes[1].bar(labels, d1_pct, color=colors)
+    axes[1].bar(x, d1_pct, color=colors, width=0.55, edgecolor="black", linewidth=0.6)
+    axes[1].set_xticks(list(x))
+    axes[1].set_xticklabels(labels)
     axes[1].set_ylabel("D1-all (%)")
-    axes[1].set_title("D1-all")
+    axes[1].set_title("D1-all (>3px & >5%)")
+    axes[1].set_ylim(bottom=0)
+    axes[1].yaxis.grid(True, linestyle="--", alpha=0.35)
+    axes[1].set_axisbelow(True)
+    _annotate_bars(axes[1], d1_pct, "{:.2f}%")
 
     if suptitle:
         fig.suptitle(suptitle, fontsize=11)
-        fig.tight_layout(rect=(0, 0, 1, 0.94))
+        fig.tight_layout(rect=(0, 0, 1, 0.92))
     else:
         fig.tight_layout()
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=150)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
+
+
+def maybe_display_saved_plot(plot_path: Path) -> None:
+    """Show the PNG in Jupyter/Colab when the script runs in-notebook (not via subprocess)."""
+    try:
+        ip = __import__("IPython").get_ipython()
+    except ImportError:
+        return
+    if ip is None:
+        return
+    from IPython.display import Image, display
+
+    display(Image(filename=str(plot_path)))
 
 
 def save_loader_preds(model, loader, device, out_dir, show=False, title_prefix=""):
@@ -134,6 +174,7 @@ def main():
     plot_title = f"{args.degrade_type} sev{args.degrade_severity} {args.degrade_camera}"
     save_epe_d1_plots(clean_metrics, degraded_metrics, plot_path, suptitle=plot_title)
     print("Wrote", plot_path)
+    maybe_display_saved_plot(plot_path)
 
     save_loader_preds(model, clean_loader, device, out / "clean", args.show)
     save_loader_preds(model, degraded_loader, device, out / "degraded", args.show, "degraded")
