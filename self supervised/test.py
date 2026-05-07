@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -78,10 +79,24 @@ def main():
 
     clean_metrics = validate_epe(model, clean_loader, device)
     degraded_metrics = validate_epe(model, degraded_loader, device)
-    print("Clean EPE:", round(clean_metrics['EPE'], 4))
-    print(f"Degraded EPE: {degraded_metrics['EPE']:.4f}")
+
+    def _print_split(title: str, m: dict) -> None:
+        print(f"\n{title}")
+        print(f"  Average EPE:        {m['EPE']:.4f}")
+        print(f"  Average D1-all:     {m['D1-all']:.4f}")
+        print(f"  Average left w.:    {m['w_left']:.4f}")
+        print(f"  Average right w.:   {m['w_right']:.4f}")
+
+    _print_split("Clean", clean_metrics)
+    _print_split("Degraded", degraded_metrics)
 
     out = Path(args.output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    metrics_path = out / "metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump({"clean": clean_metrics, "degraded": degraded_metrics}, f, indent=2)
+    print("\nWrote", metrics_path)
+
     save_loader_preds(model, clean_loader, device, out / "clean", args.show)
     save_loader_preds(model, degraded_loader, device, out / "degraded", args.show, "degraded")
     print("Saved disparity/depth images to:", out)
