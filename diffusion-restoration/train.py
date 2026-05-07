@@ -85,7 +85,7 @@ def train_one_epoch(model, loader, optimizer):
             deg_out["logits"], clean_out["corrected"], bin_centers, valid, cfg.CE_SIGMA
         )
         ce_clean_loss = ce_self_supervised_loss(clean_out["logits"], gt, bin_centers, valid, cfg.CE_SIGMA)
-        gate_loss = gate_alignment_loss(clean_out["gate_info"], clean_meta, cfg.DEVICE) + gate_alignment_loss(
+        gate_loss = gate_reg_loss(clean_out["gate_info"], clean_meta, cfg.DEVICE) + gate_reg_loss(
             deg_out["gate_info"], deg_meta, cfg.DEVICE
         )
         diff_loss = F.mse_loss(deg_out["corrected"], clean_out["corrected"].detach())
