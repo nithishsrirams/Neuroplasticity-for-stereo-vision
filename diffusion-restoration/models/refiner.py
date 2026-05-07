@@ -19,7 +19,7 @@ class SimpleEnhancer(nn.Module):
         return torch.clamp(x + 0.1 * self.net(x), 0.0, 1.0)
 
 
-class RefinementNetCE(nn.Module):
+class RefineNet(nn.Module):
     def __init__(self, in_channels, hidden=64, n_bins=64, max_disp=192):
         super().__init__()
         self.n_bins = n_bins
