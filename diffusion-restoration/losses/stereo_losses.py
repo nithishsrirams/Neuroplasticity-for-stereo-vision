@@ -13,14 +13,20 @@ def ce_self_supervised_loss(deg_logits, clean_disp, bin_centers, valid_mask, sig
     return ce_map[valid_mask].mean() if valid_mask.sum() > 0 else ce_map.mean()
 
 
-def gate_alignment_loss(gate_info, meta, device):
+def gate_reg_loss(gate_info, meta):
     if gate_info is None or meta is None:
         return torch.tensor(0.0, device=device)
+
+    meta_list = unpack_batch_meta(meta)
+    if not meta_list:
+        return torch.tensor(0.0, device=device)
+
     wl = gate_info["w_left"].view(gate_info["w_left"].size(0), -1).mean(dim=1)
     wr = gate_info["w_right"].view(gate_info["w_right"].size(0), -1).mean(dim=1)
     pred_w = torch.stack([wl, wr], dim=1)
+
     targets = []
-    for m in meta:
+    for m in meta_list:
         side = m.get("side", "none")
         if not m.get("degraded", False):
             targets.append([0.50, 0.50])
@@ -30,5 +36,6 @@ def gate_alignment_loss(gate_info, meta, device):
             targets.append([0.80, 0.20])
         else:
             targets.append([0.50, 0.50])
+
     target = torch.tensor(targets, dtype=pred_w.dtype, device=pred_w.device)
     return F.mse_loss(pred_w, target)
