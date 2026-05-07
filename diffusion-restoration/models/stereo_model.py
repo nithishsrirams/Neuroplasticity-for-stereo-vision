@@ -6,35 +6,21 @@ from models.psmnet_wrapper import GatedPSMNet, get_pred
 from models.refiner import RefinementNetCE, SimpleEnhancer
 
 
-def collated_meta_to_list(meta):
-    if meta is None:
+def unpack_batch_meta(meta_batch):
+    if meta_batch is None:
         return []
-    if isinstance(meta, list):
-        return meta
-    if isinstance(meta, dict):
-        batch_size = None
-        for v in meta.values():
-            if isinstance(v, (list, tuple)):
-                batch_size = len(v)
-                break
-            if torch.is_tensor(v) and v.ndim >= 1:
-                batch_size = v.shape[0]
-                break
-        if batch_size is None:
-            return [meta]
-        out = []
-        for i in range(batch_size):
-            item = {}
-            for k, v in meta.items():
-                if isinstance(v, (list, tuple)):
-                    item[k] = v[i]
-                elif torch.is_tensor(v) and v.ndim >= 1:
-                    item[k] = v[i].item() if v[i].numel() == 1 else v[i]
-                else:
-                    item[k] = v
-            out.append(item)
-        return out
-    return [meta]
+    if isinstance(meta_batch, list):
+        return meta_batch
+    batch_size = len(meta_batch["degraded"])
+    return [
+        {
+            "degraded": bool(meta_batch["degraded"][i]),
+            "type":     meta_batch["type"][i],
+            "level":    int(meta_batch["level"][i]),
+            "side":     meta_batch["side"][i],
+        }
+        for i in range(batch_size)
+    ]
 
 
 class StereoWithCorrection(nn.Module):
@@ -51,12 +37,12 @@ class StereoWithCorrection(nn.Module):
         else:
             refiner_in = 9
 
-        self.refiner = RefinementNetCE(refiner_in, hidden=64, n_bins=n_bins, max_disp=maxdisp)
+        self.refiner = RefineNet(refiner_in, hidden=64, n_bins=n_bins, max_disp=maxdisp)
 
     def enhance(self, img, meta):
         if meta is None:
             return img
-        meta_list = collated_meta_to_list(meta)
+        meta_list = unpack_batch_meta(meta)
         mask = torch.tensor([m.get("degraded", False) for m in meta_list], device=img.device).bool()
         if mask.any():
             enhanced = img.clone()
